@@ -525,7 +525,6 @@ export default function Workspace() {
                       <AgentInput
                         value={input.context || ''}
                         onChange={(val) => changeField('context', val)}
-                        onSubmit={handleGenerate}
                         busy={busy}
                         disabled={busy}
                         canSubmit={Boolean(input.context.trim() || (input.name.trim() && input.niche.trim()))}

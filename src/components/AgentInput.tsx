@@ -1,12 +1,11 @@
 'use client';
 
-import { useRef, useEffect, type FormEvent, type KeyboardEvent } from 'react';
+import { useRef, useEffect, type KeyboardEvent } from 'react';
 import { Send, Loader2, Sparkles, X } from 'lucide-react';
 
 interface AgentInputProps {
   value: string;
   onChange: (value: string) => void;
-  onSubmit: (event: FormEvent) => void;
   busy: boolean;
   placeholder?: string;
   disabled?: boolean;
@@ -17,7 +16,6 @@ interface AgentInputProps {
 export function AgentInput({
   value,
   onChange,
-  onSubmit,
   busy,
   placeholder = 'Descreva a situação... Ex: "Preciso fazer follow-up com a Carla da clínica, ela pediu para ligar terça mas não atendeu"',
   disabled,
