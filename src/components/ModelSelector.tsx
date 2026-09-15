@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, type ChangeEvent } from 'react';
-import { Sparkles, Cpu, Zap, Globe, Check, ChevronDown, ExternalLink, AlertTriangle } from 'lucide-react';
+import { Sparkles, Cpu, Zap, Globe, Check, ChevronDown, AlertTriangle } from 'lucide-react';
 import { type Engine, type UserConfig, ENGINES } from '@/lib/domain';
 
 interface ModelSelectorProps {
@@ -103,9 +103,11 @@ export function ModelSelector({
     return (
       <button
         key={engine}
+        role="option"
+        aria-selected={selected}
         className={`engine-option ${selected ? 'selected' : ''} ${!available && engine !== currentEngine ? 'unavailable' : ''}`}
         onClick={() => handleEngineClick(engine)}
-        disabled={disabled || (!available && engine !== currentEngine)}
+        disabled={disabled}
         title={!available ? 'Clique para configurar' : undefined}
       >
         <div className="engine-icon">{info.icon}</div>
@@ -128,8 +130,9 @@ export function ModelSelector({
           <h4>Configurar Llama (Ollama)</h4>
           <p className="config-hint">Certifique-se de ter o Ollama rodando: <code>ollama serve</code></p>
           <div className="config-field">
-            <label>Endpoint</label>
+            <label htmlFor="llama-endpoint">Endpoint</label>
             <input
+              id="llama-endpoint"
               type="url"
               value={localConfig.llamaEndpoint}
               onChange={(e: ChangeEvent<HTMLInputElement>) => setLocalConfig(prev => ({ ...prev, llamaEndpoint: e.target.value }))}
@@ -137,8 +140,9 @@ export function ModelSelector({
             />
           </div>
           <div className="config-field">
-            <label>Modelo</label>
+            <label htmlFor="llama-model">Modelo</label>
             <input
+              id="llama-model"
               type="text"
               value={localConfig.llamaModel}
               onChange={(e: ChangeEvent<HTMLInputElement>) => setLocalConfig(prev => ({ ...prev, llamaModel: e.target.value }))}
@@ -164,8 +168,9 @@ export function ModelSelector({
           <h4>Configurar OpenAI-compatível</h4>
           <p className="config-hint">Suporta: Groq, Together AI, LM Studio, vLLM, OpenRouter, etc.</p>
           <div className="config-field">
-            <label>Endpoint</label>
+            <label htmlFor="openai-endpoint">Endpoint</label>
             <input
+              id="openai-endpoint"
               type="url"
               value={localConfig.openaiEndpoint}
               onChange={(e: ChangeEvent<HTMLInputElement>) => setLocalConfig(prev => ({ ...prev, openaiEndpoint: e.target.value }))}
@@ -173,8 +178,9 @@ export function ModelSelector({
             />
           </div>
           <div className="config-field">
-            <label>Modelo</label>
+            <label htmlFor="openai-model">Modelo</label>
             <input
+              id="openai-model"
               type="text"
               value={localConfig.openaiModel}
               onChange={(e: ChangeEvent<HTMLInputElement>) => setLocalConfig(prev => ({ ...prev, openaiModel: e.target.value }))}
@@ -182,8 +188,8 @@ export function ModelSelector({
             />
           </div>
           <div className="config-field">
-            <label>API Key (configurada no servidor)</label>
-            <input type="password" disabled placeholder="Configure via variável de ambiente no servidor" />
+            <label htmlFor="openai-key-state">API Key (configurada no servidor)</label>
+            <input id="openai-key-state" type="password" disabled placeholder="Configure via variável de ambiente no servidor" />
           </div>
           <div className="config-actions">
             <button className="secondary-button" onClick={() => setShowConfig(null)}>Cancelar</button>
@@ -198,8 +204,8 @@ export function ModelSelector({
           <h4>Claude (Anthropic)</h4>
           <p className="config-hint">Requer configuração no servidor (ANTHROPIC_API_KEY, ANTHROPIC_MODEL) e conta autenticada.</p>
           <div className="config-field">
-            <label>Modelo (configurado no servidor)</label>
-            <input type="text" disabled placeholder="claude-3-5-sonnet-20241022" />
+            <label htmlFor="anthropic-model-state">Modelo (configurado no servidor)</label>
+            <input id="anthropic-model-state" type="text" disabled placeholder="claude-3-5-sonnet-20241022" />
           </div>
           <div className="config-actions">
             <button className="secondary-button" onClick={() => setShowConfig(null)}>Fechar</button>

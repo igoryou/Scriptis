@@ -4,7 +4,7 @@ import { detectScriptType } from "./detectScriptType";
 import { buildPrompt } from "./buildPrompt";
 import { composeLocal } from "./composeLocal";
 import { composeLlama, checkOllamaAvailability } from "./composeLlama";
-import { composeOpenAI, checkOpenAIAvailability } from "./composeOpenAI";
+
 
 export interface OrchestratorOptions {
   userConfig?: UserConfig;
@@ -90,8 +90,6 @@ export async function generateScript(options: OrchestratorOptions): Promise<Orch
     }
     
     case "openai_compatible": {
-      const openaiEndpoint = userConfig.openaiEndpoint;
-      const openaiModel = userConfig.openaiModel;
       // API key não deve vir no userConfig do cliente - rota server-side
       throw new Error("Engine 'openai_compatible' deve ser chamado via /api/generate no servidor (requer autenticação e chave configurada).");
     }
@@ -131,7 +129,7 @@ export async function generateAlternative(
 }
 
 /** Lista engines disponíveis baseada na configuração do usuário. */
-export function getAvailableEngines(userConfig: UserConfig): Array<{ engine: Engine; label: string; available: boolean; reason?: string }> {
+export function getAvailableEngines(): Array<{ engine: Engine; label: string; available: boolean; reason?: string }> {
   const engines: Array<{ engine: Engine; label: string; available: boolean; reason?: string }> = [
     { engine: "local", label: "Local (gratuito, offline)", available: true },
     { engine: "llama", label: "Llama (Ollama local)", available: false, reason: "Requer Ollama rodando localmente" },

@@ -12,6 +12,7 @@ const input = {
   tone: "Casual",
   hook: "",
   relationship: "Contato frio",
+  scriptType: "abordagem_inicial",
 } as const;
 const request = (body: unknown) =>
   new Request("http://localhost/api/generate", {
@@ -33,7 +34,7 @@ test("explicit local generation uses the real free composer without auth or netw
   assert.equal(response.status, 200);
   const { generation } = await response.json();
   assert.equal(generationSchema.safeParse(generation).success, true);
-  assert.equal(generation.provider, "local");
+  assert.equal(generation.engine, "local");
   assert.equal(generation.variants.length, 3);
   assert.equal(generation.input.name, "Lia");
 });

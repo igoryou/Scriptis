@@ -1,7 +1,7 @@
 'use client';
 
 import { useRef, useEffect, useState } from 'react';
-import { Copy, Check, ChevronDown, ChevronUp, Code2, Sparkles } from 'lucide-react';
+import { Copy, ChevronDown, Code2, Sparkles } from 'lucide-react';
 import { type PromptVersion } from '@/lib/domain';
 
 interface PromptDisplayProps {

@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, type FormEvent, type KeyboardEvent } from 'react';
-import { Search, Star, Trash2, ArrowUpRight, Filter, X, ChevronDown, MessageSquare, Mail, Camera, Link2, Clock, Zap, Cpu, Sparkles, Globe, ChevronUp } from 'lucide-react';
-import { type Generation, type HistoryEntry, type ScriptType, type Engine, SCRIPT_TYPES, ENGINES, CHANNELS } from '@/lib/domain';
+import { useState } from 'react';
+import { Search, Star, Trash2, ArrowUpRight, Filter, ChevronDown, MessageSquare, Mail, Camera, Link2, Clock, Zap, Cpu, Sparkles, Globe, ChevronUp, Code2 } from 'lucide-react';
+import { type Generation, type ScriptType, type Engine } from '@/lib/domain';
 
 interface HistoryListProps {
   history: Generation[];
@@ -12,7 +12,6 @@ interface HistoryListProps {
   searchQuery?: string;
   onSearchChange: (query: string) => void;
   onFilterChange: (filter: 'all' | 'favorites') => void;
-  currentEngine?: Engine;
   userAuthenticated?: boolean;
 }
 
@@ -48,7 +47,6 @@ export function HistoryList({
   searchQuery = '',
   onSearchChange,
   onFilterChange,
-  currentEngine,
   userAuthenticated = false,
 }: HistoryListProps) {
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
@@ -149,7 +147,6 @@ export function HistoryList({
 
       <div className="history-list">
         {filtered.map(generation => {
-          const Icon = CHANNEL_ICONS[generation.input.channel] || MessageSquare;
           const isExpanded = expandedId === generation.id;
           const engineIcon = ENGINE_ICONS[generation.engine] || <Sparkles size={12} />;
 
@@ -278,6 +275,3 @@ export function HistoryList({
     </section>
   );
 }
-
-import { useRef, useEffect } from 'react';
-import { Code2 } from 'lucide-react';

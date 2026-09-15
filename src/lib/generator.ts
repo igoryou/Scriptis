@@ -1,4 +1,4 @@
-import { leadInputSchema, type Generation, type LeadInput } from "./domain";
+import { type Generation, type LeadInput } from "./domain";
 import { buildPrompt } from "./agent/buildPrompt";
 import { composeLocal as agentComposeLocal } from "./agent/composeLocal";
 

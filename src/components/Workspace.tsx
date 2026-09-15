@@ -1,10 +1,11 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback, type FormEvent, type KeyboardEvent } from 'react';
-import { Feather, History, Star, Settings2, Plus, ShieldCheck, Leaf, MessagesSquare, ChevronLeft, X, ArrowRight, Loader2, Cpu, Zap, Globe, Mail, Link2, Camera, Check, Search, Filter, Trash2, ArrowUpRight, Clock, Code2, ChevronDown, ChevronUp, Copy, ChevronRight, ExternalLink } from 'lucide-react';
-import { CHANNELS, OBJECTIVES, TONES, RELATIONSHIPS, ENGINES, type Generation, type LeadInput, type Engine, type UserConfig, type ScriptType, leadInputSchema, situationInputSchema, userConfigSchema, generationSchema } from '@/lib/domain';
-import { generateScript, validateSituation, getAvailableEngines } from '@/lib/agent';
-import { readLocalHistory, upsertHistory, writeLocalHistory, HISTORY_KEY } from '@/lib/local-history';
+import { useState, useEffect, useRef, type FormEvent } from 'react';
+import { Feather, History, Star, Settings2, Plus, ShieldCheck, Leaf, MessagesSquare, ChevronLeft, X, ArrowRight, Cpu, Zap, Globe, Mail, Link2, Camera, Check, ChevronRight } from 'lucide-react';
+import { CHANNELS, OBJECTIVES, TONES, RELATIONSHIPS, type Generation, type LeadInput, type Engine, type UserConfig, leadInputSchema, userConfigSchema, generationSchema } from '@/lib/domain';
+import { generateScript, validateSituation } from '@/lib/agent';
+import { readLocalHistory, upsertHistory, writeLocalHistory } from '@/lib/local-history';
+import { useRouter } from 'next/navigation';
 import { AgentInput } from './AgentInput';
 import { ScriptCard } from './ScriptCard';
 import { PromptDisplay } from './PromptDisplay';
@@ -39,6 +40,7 @@ function formatElapsed(ms: number) {
 }
 
 export default function Workspace() {
+  const router = useRouter();
   const [view, setView] = useState<View>('create');
   const [input, setInput] = useState<LeadInput>(emptyInput);
   const [current, setCurrent] = useState<Generation | null>(null);
@@ -69,15 +71,22 @@ export default function Workspace() {
       try { settings = await fetchConfig(); } catch { /* fallback */ }
       if (cancelled) return;
       setConfig(settings);
-      setCurrentEngine(settings.user ? 'local' : userConfig.defaultEngine);
-      setUserConfig(userConfigSchema.parse({ ...userConfig, ...(settings.llamaAvailable ? { llamaEndpoint: 'http://localhost:11434' } : {}) }));
+      setUserConfig((currentConfig) => {
+        const restored = userConfigSchema.parse({
+          ...currentConfig,
+          ...(settings.llamaAvailable ? { llamaEndpoint: 'http://localhost:11434' } : {}),
+        });
+        setCurrentEngine(settings.user ? 'local' : restored.defaultEngine);
+        return restored;
+      });
       
       try {
         if (settings.user) {
           const result = await fetch('/api/history', { signal: AbortSignal.timeout(10000) });
           if (result.ok) {
-            const data = await result.json();
-            const rows = (data.generations || []).map((row: any) => generationSchema.parse(row));
+            const data: unknown = await result.json();
+            const payload = typeof data === 'object' && data !== null ? data as Record<string, unknown> : {};
+            const rows = generationSchema.array().parse(payload.generations ?? []);
             if (!cancelled) setHistory(rows);
           }
         } else {
@@ -137,13 +146,15 @@ export default function Workspace() {
       return;
     }
     
-    const save = saveQueue.current.catch(() => {}).then(() => 
-      fetch('/api/history', { 
-        method: 'POST', 
-        headers: { 'Content-Type': 'application/json' }, 
-        body: JSON.stringify({ generation }) 
-      })
-    );
+    const save = saveQueue.current.catch(() => {}).then(async () => {
+      const response = await fetch('/api/history', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ generation }),
+      });
+      if (!response.ok) throw new Error('Não foi possível sincronizar esta geração.');
+      return response;
+    });
     saveQueue.current = save;
     try { 
       await save; 
@@ -159,8 +170,8 @@ export default function Workspace() {
     
     let validatedInput: LeadInput;
     
-    const hasStructuredInput = input.name || input.niche || input.hook || input.context;
-    if (!hasStructuredInput && input.context) {
+    const hasRequiredStructuredInput = input.name.trim() && input.niche.trim();
+    if (!hasRequiredStructuredInput && input.context.trim()) {
       const validation = await validateSituation(input.context);
       if (!validation.valid || !validation.parsed) {
         setError('Não consegui entender a situação. Tente ser mais específico ou use os campos ao lado.');
@@ -179,16 +190,29 @@ export default function Workspace() {
     
     try {
       const iteration = generationIndex.current++;
-      const result = await generateScript({
-        leadInput: validatedInput,
-        userConfig,
-        engine: currentEngine,
-        iteration,
-      });
-      
-      replaceCurrent(result.generation); 
+      let generation: Generation;
+      if (currentEngine === 'anthropic' || currentEngine === 'openai_compatible') {
+        const response = await fetch('/api/generate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ input: validatedInput, provider: 'anthropic', iteration }),
+        });
+        const data: unknown = await response.json();
+        const payload = typeof data === 'object' && data !== null ? data as Record<string, unknown> : {};
+        if (!response.ok) throw new Error(typeof payload.error === 'string' ? payload.error : 'Não foi possível gerar com Claude.');
+        generation = generationSchema.parse(payload.generation);
+      } else {
+        generation = (await generateScript({
+          leadInput: validatedInput,
+          userConfig,
+          engine: currentEngine,
+          iteration,
+        })).generation;
+      }
+
+      replaceCurrent(generation);
       setElapsed(performance.now() - start);
-      await saveGeneration(result.generation);
+      await saveGeneration(generation);
       
       requestAnimationFrame(() => {
         if (window.innerWidth < 980) resultRef.current?.scrollIntoView({ 
@@ -268,7 +292,8 @@ export default function Workspace() {
     try {
       if (config.user) {
         await saveQueue.current.catch(() => {});
-        await fetch(`/api/history?id=${encodeURIComponent(generation.id)}`, { method: 'DELETE' });
+        const response = await fetch(`/api/history?id=${encodeURIComponent(generation.id)}`, { method: 'DELETE' });
+        if (!response.ok) throw new Error('Não foi possível excluir a geração sincronizada.');
       }
       const rows = history.filter(row => row.id !== generation.id);
       if (!config.user) { const problem = writeLocalHistory(localStorage, rows); if (problem) throw new Error(problem); }
@@ -300,9 +325,6 @@ export default function Workspace() {
     { id: 'favorites' as const, label: 'Favoritos', icon: Star },
   ];
 
-  const availableEngines = getAvailableEngines(userConfig);
-  const engineAvailable = availableEngines.find(e => e.engine === currentEngine)?.available ?? true;
-  const currentEngineInfo = availableEngines.find(e => e.engine === currentEngine);
 
   const ChannelIcon = {
     WhatsApp: MessagesSquare,
@@ -501,11 +523,12 @@ export default function Workspace() {
                     
                     <div className="agent-input-section">
                       <AgentInput
-                        value={input.context || input.hook || ''}
-                        onChange={(val) => { changeField('context', val); changeField('hook', val); }}
+                        value={input.context || ''}
+                        onChange={(val) => changeField('context', val)}
                         onSubmit={handleGenerate}
                         busy={busy}
                         disabled={busy}
+                        canSubmit={Boolean(input.context.trim() || (input.name.trim() && input.niche.trim()))}
                         onClear={clearInput}
                       />
                     </div>
@@ -557,7 +580,6 @@ export default function Workspace() {
                         index={tab}
                         active={true}
                         channel={current.input.channel}
-                        onSelect={() => {}}
                         onCopyMessage={copy}
                         onCopyAll={(messages, subject) => copy(
                           [...(subject ? [`Assunto: ${subject}`] : []), ...messages].join('\n\n'),
@@ -565,6 +587,7 @@ export default function Workspace() {
                         )}
                         onToggleFavorite={toggleFavorite}
                         onEditMessage={editVariant}
+                        onEditSubject={editSubject}
                       />
                       
                       <PromptDisplay
@@ -671,7 +694,13 @@ export default function Workspace() {
                   <p>{config.user ? `Conectado como ${config.user.email}. O histórico desta conta é separado dos dados locais.` : 'Sem conta, os últimos 50 registros ficam apenas neste navegador.'}</p>
                   {config.supabaseConfigured ? config.user ? (
                     <button className="secondary-button" onClick={async () => { 
-                      try { await saveQueue.current.catch(() => {}); await fetch('/api/logout', { method: 'POST' }); location.assign('/'); } 
+                      try {
+                        await saveQueue.current.catch(() => {});
+                        const response = await fetch('/api/logout', { method: 'POST' });
+                        if (!response.ok) throw new Error('Falha ao encerrar a sessão.');
+                        router.replace('/');
+                        router.refresh();
+                      }
                       catch { setError('Não foi possível sair.'); } 
                     }}>Sair da conta</button>
                   ) : (
@@ -687,7 +716,7 @@ export default function Workspace() {
               </button>
             </section>
           )}
-          {view === 'history' || view === 'favorites' && (
+          {(view === 'history' || view === 'favorites') && (
             <HistoryList
               history={history}
               onReopen={reopen}
@@ -696,7 +725,6 @@ export default function Workspace() {
               searchQuery={search}
               onSearchChange={setSearch}
               onFilterChange={setFilter}
-              currentEngine={currentEngine}
               userAuthenticated={!!config.user}
             />
           )}

@@ -13,6 +13,10 @@ export type Dependencies = {
     input: LeadInput,
     signal: AbortSignal,
   ) => Promise<Generation>;
+  generateOpenAI?: (
+    input: LeadInput,
+    signal: AbortSignal,
+  ) => Promise<Generation>;
 };
 export const json = (value: unknown, status = 200) =>
   Response.json(value, { status, headers: { "cache-control": "no-store" } });
@@ -46,7 +50,7 @@ export function guardOrigin(request: Request, settings: Settings) {
 }
 const generateSchema = z.strictObject({
   input: leadInputSchema,
-  provider: z.enum(["local", "anthropic"]),
+  provider: z.enum(["local", "anthropic", "openai_compatible"]),
   iteration: z.number().int().min(0).max(Number.MAX_SAFE_INTEGER).optional(),
 });
 export function createApi(deps: Dependencies) {
@@ -61,14 +65,20 @@ export function createApi(deps: Dependencies) {
           return json({
             generation: generateLocal(body.input, body.iteration),
           });
-        if (!deps.settings.anthropic)
+        const isAnthropic = body.provider === "anthropic";
+        const configured = isAnthropic ? deps.settings.anthropic : deps.settings.openai;
+        if (!configured)
           throw new HttpError(
             503,
-            "A Anthropic não está configurada. Use o motor gratuito.",
+            `${isAnthropic ? "A Anthropic" : "A API OpenAI-compatível"} não está configurada. Use o motor gratuito.`,
           );
         if (!(await deps.getUser(signal)))
-          throw new HttpError(401, "Entre na sua conta para usar a Anthropic.");
-        if (!deps.consumeQuota || !deps.generateAnthropic)
+          throw new HttpError(
+            401,
+            `Entre na sua conta para usar ${isAnthropic ? "a Anthropic" : "a API OpenAI-compatível"}.`,
+          );
+        const generatePaid = isAnthropic ? deps.generateAnthropic : deps.generateOpenAI;
+        if (!deps.consumeQuota || !generatePaid)
           throw new HttpError(
             503,
             "A integração está incompleta. Use o motor gratuito.",
@@ -76,10 +86,10 @@ export function createApi(deps: Dependencies) {
         if (!(await deps.consumeQuota(signal)))
           throw new HttpError(
             429,
-            "O limite diário de gerações com Claude foi atingido. O motor gratuito continua disponível.",
+            "O limite diário de gerações por API foi atingido. O motor gratuito continua disponível.",
           );
         return json({
-          generation: await deps.generateAnthropic(body.input, signal),
+          generation: await generatePaid(body.input, signal),
         });
       }),
     config: () =>
@@ -88,6 +98,7 @@ export function createApi(deps: Dependencies) {
         return json({
           supabaseConfigured: !!deps.settings.supabase,
           anthropicConfigured: !!deps.settings.anthropic,
+          openaiConfigured: !!deps.settings.openai,
           user: user ? { id: user.id, email: user.email } : null,
         });
       }),

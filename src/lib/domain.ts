@@ -31,8 +31,6 @@ export type Engine = (typeof ENGINES)[number];
 const singleLine = (max: number) => z.string().max(max).trim().min(1)
   .refine((value) => !/[\p{Cc}\p{Zl}\p{Zp}]/u.test(value), 'Use apenas uma linha de texto.');
 
-const multiLine = (max: number) => z.string().max(max).trim().min(1)
-  .refine((value) => !/\p{Cc}/u.test(value.replace(/[\n\r\t]/g, '')), 'Contém caracteres de controle.');
 
 /* ─── Entrada bruta do usuário (linguagem natural) ─── */
 

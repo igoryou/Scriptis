@@ -91,9 +91,9 @@ const stylesByType: Record<ScriptType, Array<{ title: string; description: strin
   ],
 };
 
-function formatMessagesForChannel(messages: string[], channel: Channel, subject?: string): string[] {
-  if (channel === "E-mail" && subject) {
-    return [`Assunto: ${subject}\n\n${messages.join("\n\n")}`];
+function formatMessagesForChannel(messages: string[], channel: Channel): string[] {
+  if (channel === "E-mail") {
+    return [messages.join("\n\n")];
   }
   if (channel === "LinkedIn") {
     return [messages.join(" ")];
@@ -218,12 +218,12 @@ export function composeLocal(raw: LeadInput, iteration = 0): Generation {
     contexts = contexts.map(c => c + " A ideia é entender seu contexto, sem partir de solução pronta.");
   }
   if (alternate) {
-    contexts = contexts.map((c, i) => `${formal ? "Gostaria de" : "Queria"} abrir uma conversa sobre ${input.niche}. ${input.hook ? `O ponto de partida é “${input.hook}”. ` : ""}Se for relevante, podemos explorar juntos.`);
+    contexts = contexts.map(() => `${formal ? "Gostaria de" : "Queria"} abrir uma conversa sobre ${input.niche}. ${input.hook ? `O ponto de partida é “${input.hook}”. ` : ""}Se for relevante, podemos explorar juntos.`);
   }
   
   const variants = styles.map((style, index) => {
     const opening = [greeting, relation || greetingSuffix].filter(Boolean).join(" ");
-    let context = contexts[index % contexts.length];
+    const context = contexts[index % contexts.length];
     
     let invitation = invitations[(index + iteration) % invitations.length];
     if (formal) {
@@ -252,16 +252,15 @@ export function composeLocal(raw: LeadInput, iteration = 0): Generation {
     };
   });
   
-  const promptVersions = buildPrompt(input).map((pv, i) => ({ ...pv, engine: "local" as const }));
+  const promptVersions = buildPrompt(input).map((pv) => ({ ...pv, engine: "local" as const }));
   
   return {
     id: crypto.randomUUID(),
     createdAt: new Date().toISOString(),
-    situationRaw: input.context,
+    situationRaw: input.context || `${input.scriptType}: ${input.name} — ${input.niche} (${input.channel})`,
     input,
     variants,
     promptVersions,
     engine: "local",
-    model: undefined,
   };
 }

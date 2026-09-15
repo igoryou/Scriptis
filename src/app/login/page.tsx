@@ -1,49 +1,44 @@
 'use client';
 
-import { useState, useEffect, type FormEvent } from 'react';
+import { Suspense, useState, type FormEvent } from 'react';
 import { Mail, Loader2, ArrowRight } from 'lucide-react';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import { Brand } from '@/components/brand';
 
-export default function LoginPage() {
+function LoginContent() {
+  const searchParams = useSearchParams();
   const [email, setEmail] = useState('');
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState('');
+  const [formError, setFormError] = useState('');
   const [message, setMessage] = useState('');
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-    const params = new URLSearchParams(window.location.search);
-    const urlError = params.get('error');
-    if (urlError) { 
-      setError(decodeURIComponent(urlError)); 
-      window.history.replaceState({}, '', '/login'); 
-    }
-  }, []);
+  const callbackError = searchParams.get('error');
+  const error = formError || (callbackError ? decodeURIComponent(callbackError) : '');
 
   async function submit(event: FormEvent) {
     event.preventDefault();
-    setError(''); setMessage('');
-    if (!email || !email.includes('@')) { setError('Informe um e-mail válido.'); return; }
+    setFormError('');
+    setMessage('');
+    if (!email || !email.includes('@')) {
+      setFormError('Informe um e-mail válido.');
+      return;
+    }
     setBusy(true);
     try {
-      const response = await fetch('/api/auth', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email }) });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || 'Não foi possível enviar o link.');
-      setMessage(data.message || 'Verifique seu e-mail e clique no link de acesso.');
-    } catch (cause) { setError(cause instanceof Error ? cause.message : 'Erro inesperado.'); }
-    finally { setBusy(false); }
-  }
-
-  if (!mounted) {
-    return (
-      <div className="login-shell">
-        <div className="login-card">
-          <div className="login-brand"><Brand /></div>
-        </div>
-      </div>
-    );
+      const response = await fetch('/api/auth', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      });
+      const data: unknown = await response.json();
+      const result = typeof data === 'object' && data !== null ? data as Record<string, unknown> : {};
+      if (!response.ok) throw new Error(typeof result.error === 'string' ? result.error : 'Não foi possível enviar o link.');
+      setMessage(typeof result.message === 'string' ? result.message : 'Verifique seu e-mail e clique no link de acesso.');
+    } catch (cause) {
+      setFormError(cause instanceof Error ? cause.message : 'Erro inesperado.');
+    } finally {
+      setBusy(false);
+    }
   }
 
   return (
@@ -70,5 +65,13 @@ export default function LoginPage() {
         <Link href="/" className="back-link"><ArrowRight size={15} />Voltar ao gerador gratuito</Link>
       </div>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<div className="login-shell"><div className="login-card"><div className="login-brand"><Brand /></div></div></div>}>
+      <LoginContent />
+    </Suspense>
   );
 }

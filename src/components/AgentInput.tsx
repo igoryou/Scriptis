@@ -1,7 +1,7 @@
 'use client';
 
-import { useRef, useEffect, useState, type FormEvent, type KeyboardEvent } from 'react';
-import { Mic, Send, Loader2, Sparkles, X } from 'lucide-react';
+import { useRef, useEffect, type FormEvent, type KeyboardEvent } from 'react';
+import { Send, Loader2, Sparkles, X } from 'lucide-react';
 
 interface AgentInputProps {
   value: string;
@@ -10,6 +10,7 @@ interface AgentInputProps {
   busy: boolean;
   placeholder?: string;
   disabled?: boolean;
+  canSubmit?: boolean;
   onClear?: () => void;
 }
 
@@ -20,10 +21,11 @@ export function AgentInput({
   busy,
   placeholder = 'Descreva a situação... Ex: "Preciso fazer follow-up com a Carla da clínica, ela pediu para ligar terça mas não atendeu"',
   disabled,
+  canSubmit = true,
   onClear,
 }: AgentInputProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const [height, setHeight] = useState(60);
+
   const minHeight = 60;
   const maxHeight = 280;
 
@@ -31,7 +33,6 @@ export function AgentInput({
     if (textareaRef.current) {
       textareaRef.current.style.height = `${minHeight}px`;
       const newHeight = Math.min(textareaRef.current.scrollHeight, maxHeight);
-      setHeight(newHeight);
       textareaRef.current.style.height = `${newHeight}px`;
     }
   }, [value]);
@@ -45,7 +46,7 @@ export function AgentInput({
   };
 
   return (
-    <form onSubmit={onSubmit} className="agent-input-form">
+    <div className="agent-input-form">
       <div className="agent-input-wrapper">
         <textarea
           ref={textareaRef}
@@ -80,7 +81,7 @@ export function AgentInput({
             <button
               type="submit"
               className={`primary-button generate-button ${busy ? 'busy' : ''}`}
-              disabled={busy || !value.trim() || disabled}
+              disabled={busy || disabled || !canSubmit}
               aria-busy={busy}
             >
               {busy ? (
@@ -98,6 +99,6 @@ export function AgentInput({
           </div>
         </div>
       </div>
-    </form>
+    </div>
   );
 }

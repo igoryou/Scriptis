@@ -2,6 +2,7 @@
 export interface Settings {
   supabase: { url: string; key: string } | null;
   anthropic: { apiKey: string; model: string } | null;
+  openai: { endpoint: string; apiKey: string; model: string } | null;
   siteOrigin: string | null;
 }
 
@@ -31,6 +32,19 @@ function origin(value: string | undefined): string | null {
   }
 }
 
+function apiEndpoint(value: string | undefined): string | null {
+  if (!value) return null;
+  try {
+    const url = new URL(value);
+    if (url.username || url.password || url.search || url.hash) return null;
+    const loopback = ["localhost", "127.0.0.1", "[::1]"].includes(url.hostname);
+    if (url.protocol !== "https:" && !(url.protocol === "http:" && loopback)) return null;
+    return url.toString().replace(/\/$/, "");
+  } catch {
+    return null;
+  }
+}
+
 export function readSettings(
   env: Record<string, string | undefined>,
 ): Settings {
@@ -40,9 +54,16 @@ export function readSettings(
   const supabase = siteOrigin && url && key ? { url, key } : null;
   const apiKey = env.ANTHROPIC_API_KEY?.trim();
   const model = env.ANTHROPIC_MODEL?.trim();
+  const openaiEndpoint = apiEndpoint(env.OPENAI_COMPATIBLE_BASE_URL);
+  const openaiApiKey = env.OPENAI_COMPATIBLE_API_KEY?.trim();
+  const openaiModel = env.OPENAI_COMPATIBLE_MODEL?.trim();
   return {
     siteOrigin,
     supabase,
     anthropic: supabase && apiKey && model ? { apiKey, model } : null,
+    openai:
+      supabase && openaiEndpoint && openaiApiKey && openaiModel
+        ? { endpoint: openaiEndpoint, apiKey: openaiApiKey, model: openaiModel }
+        : null,
   };
 }

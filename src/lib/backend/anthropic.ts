@@ -59,5 +59,5 @@ export async function generateWithClaude(
       502,
       "A IA não retornou as abordagens. Tente novamente.",
     );
-  return parseClaudePayload(output.input, input);
+  return parseClaudePayload(output.input, input, settings.anthropic.model);
 }

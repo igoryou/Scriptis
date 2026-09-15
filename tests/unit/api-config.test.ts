@@ -10,6 +10,9 @@ test("configured flags require complete settings and never expose keys or extra 
     NEXT_PUBLIC_SITE_URL: "https://scriptis.example",
     ANTHROPIC_API_KEY: "private-key",
     ANTHROPIC_MODEL: "configured-model",
+    OPENAI_COMPATIBLE_BASE_URL: "https://api.example.com/v1",
+    OPENAI_COMPATIBLE_API_KEY: "openai-private-key",
+    OPENAI_COMPATIBLE_MODEL: "openai-model",
   };
   const settings = readSettings(env);
   const response = await createApi({
@@ -23,6 +26,7 @@ test("configured flags require complete settings and never expose keys or extra 
   assert.deepEqual(await response.json(), {
     supabaseConfigured: true,
     anthropicConfigured: true,
+    openaiConfigured: true,
     user: { id: "user-1", email: "user@example.com" },
   });
   const noAuth = await createApi({
@@ -32,13 +36,16 @@ test("configured flags require complete settings and never expose keys or extra 
     }),
     getUser: async () => null,
   }).config();
-  assert.equal((await noAuth.json()).anthropicConfigured, false);
+  const noAuthConfig = await noAuth.json();
+  assert.equal(noAuthConfig.anthropicConfigured, false);
+  assert.equal(noAuthConfig.openaiConfigured, false);
   assert.equal(
     readSettings({ ...env, NEXT_PUBLIC_SITE_URL: "https://other.example/path" })
       .supabase,
     null,
   );
   assert.equal(readSettings({ ...env, ANTHROPIC_MODEL: "" }).anthropic, null);
+  assert.equal(readSettings({ ...env, OPENAI_COMPATIBLE_BASE_URL: "http://remote.example/v1" }).openai, null);
 });
 
 test("unconfigured config keeps the free base available without touching auth or returning secrets", async () => {
@@ -54,6 +61,7 @@ test("unconfigured config keeps the free base available without touching auth or
   assert.deepEqual(await response.json(), {
     supabaseConfigured: false,
     anthropicConfigured: false,
+    openaiConfigured: false,
     user: null,
   });
 });

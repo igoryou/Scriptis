@@ -29,10 +29,14 @@ async function callOpenAICompatible(
   messages: OpenAIMessage[],
   temperature = 0.7,
   maxTokens = 2048,
-  timeoutMs = 15000
+  timeoutMs = 12_000,
+  parentSignal?: AbortSignal,
 ): Promise<string> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  const signal = parentSignal
+    ? AbortSignal.any([controller.signal, parentSignal])
+    : controller.signal;
   
   try {
     const response = await fetch(`${endpoint}/chat/completions`, {
@@ -49,7 +53,7 @@ async function callOpenAICompatible(
         top_p: 0.9,
         response_format: { type: "json_object" },
       } as OpenAIRequest),
-      signal: controller.signal,
+      signal,
     });
     
     clearTimeout(timeout);
@@ -87,20 +91,33 @@ function parseOpenAIResponse(response: string, input: LeadInput, promptVersions:
     }
   }
   
-  const variantes = (parsed as any).variantes || (parsed as any).variants || [];
+  const root = typeof parsed === "object" && parsed !== null
+    ? parsed as Record<string, unknown>
+    : {};
+  const variantes = root.variantes ?? root.variants ?? [];
   if (!Array.isArray(variantes) || variantes.length !== 3) {
     throw new Error("API não retornou 3 variantes válidas");
   }
   
-  const variants = variantes.map((v: any, index: number) => ({
-    id: crypto.randomUUID(),
-    title: v.titulo || v.title || `Variante ${index + 1}`,
-    description: v.descricao || v.description || "Abordagem gerada por IA",
-    messages: Array.isArray(v.mensagens) ? v.mensagens : Array.isArray(v.messages) ? v.messages : [String(v.mensagens || v.message || "")].filter(Boolean),
-    subject: v.assunto || v.subject,
-    favorite: false,
-    version: 1,
-  }));
+  const variants = variantes.map((value: unknown, index: number) => {
+    const variant = typeof value === "object" && value !== null
+      ? value as Record<string, unknown>
+      : {};
+    const rawMessages = variant.mensagens ?? variant.messages ?? variant.message;
+    const messages = Array.isArray(rawMessages)
+      ? rawMessages.filter((message): message is string => typeof message === "string")
+      : typeof rawMessages === "string" ? [rawMessages] : [];
+    const subject = variant.assunto ?? variant.subject;
+    return {
+      id: crypto.randomUUID(),
+      title: typeof (variant.titulo ?? variant.title) === "string" ? String(variant.titulo ?? variant.title) : `Variante ${index + 1}`,
+      description: typeof (variant.descricao ?? variant.description) === "string" ? String(variant.descricao ?? variant.description) : "Abordagem gerada por IA",
+      messages,
+      ...(typeof subject === "string" ? { subject } : {}),
+      favorite: false,
+      version: 1,
+    };
+  });
   
   for (const variant of variants) {
     if (variant.messages.length === 0) {
@@ -114,7 +131,7 @@ function parseOpenAIResponse(response: string, input: LeadInput, promptVersions:
   return {
     id: crypto.randomUUID(),
     createdAt: new Date().toISOString(),
-    situationRaw: input.context,
+    situationRaw: input.context || `${input.scriptType}: ${input.name} — ${input.niche} (${input.channel})`,
     input,
     variants,
     promptVersions,
@@ -134,10 +151,11 @@ export async function composeOpenAI(
     temperature?: number;
     maxTokens?: number;
     timeoutMs?: number;
+    signal?: AbortSignal;
   }
 ): Promise<Generation> {
   const input = raw;
-  const { endpoint, apiKey, model, temperature = 0.7, maxTokens = 2048, timeoutMs = 15000 } = options;
+  const { endpoint, apiKey, model, temperature = 0.7, maxTokens = 2048, timeoutMs = 12_000, signal } = options;
   
   const promptVersion = promptVersions[0];
   
@@ -153,7 +171,8 @@ export async function composeOpenAI(
     messages,
     temperature,
     maxTokens,
-    timeoutMs
+    timeoutMs,
+    signal,
   );
   
   const generation = parseOpenAIResponse(response, input, promptVersions);
@@ -162,12 +181,12 @@ export async function composeOpenAI(
 }
 
 /** Testa conexão com endpoint OpenAI-compatível. */
-export async function checkOpenAIAvailability(endpoint: string, apiKey: string, model: string): Promise<{ available: boolean; models?: string[] }> {
+export async function checkOpenAIAvailability(endpoint: string, credential: string): Promise<{ available: boolean; models?: string[] }> {
   try {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 5000);
     const response = await fetch(`${endpoint}/models`, {
-      headers: { "Authorization": `Bearer ${apiKey}` },
+      headers: { "Authorization": `Bearer ${credential}` },
       signal: controller.signal,
     });
     clearTimeout(timeout);

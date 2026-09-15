@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { generationSchema, type LeadInput, type Generation } from "../domain";
-import { buildReusablePrompt } from "../prompt";
+import { buildPrompt } from "../agent/buildPrompt";
 import { HttpError } from "./http";
 export const claudePayloadSchema = z.strictObject({
   variants: z
@@ -17,6 +17,7 @@ export const claudePayloadSchema = z.strictObject({
 export function parseClaudePayload(
   payload: unknown,
   input: LeadInput,
+  model?: string,
 ): Generation {
   const parsed = claudePayloadSchema.safeParse(payload);
   if (!parsed.success)
@@ -45,14 +46,21 @@ export function parseClaudePayload(
   const result = generationSchema.safeParse({
     id: crypto.randomUUID(),
     createdAt: new Date().toISOString(),
+    situationRaw: input.context || `${input.scriptType}: ${input.name} — ${input.niche} (${input.channel})`,
     input,
     variants: parsed.data.variants.map((variant) => ({
       ...variant,
       id: crypto.randomUUID(),
       favorite: false,
+      version: 1,
     })),
-    prompt: buildReusablePrompt(input),
-    provider: "anthropic",
+    promptVersions: buildPrompt(input).map((prompt) => ({
+      ...prompt,
+      engine: "anthropic" as const,
+      model,
+    })),
+    engine: "anthropic",
+    model,
   });
   if (!result.success)
     throw new HttpError(

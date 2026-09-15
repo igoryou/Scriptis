@@ -1,7 +1,7 @@
 'use client';
 
 import { useRef, useEffect, useState } from 'react';
-import { Copy, Check, Star, MessageSquare, Mail, Camera, Link2, ChevronDown, ChevronUp } from 'lucide-react';
+import { Copy, Star, MessageSquare, Mail, Camera, Link2 } from 'lucide-react';
 import { type Variant, type Channel } from '@/lib/domain';
 
 interface ScriptCardProps {
@@ -9,11 +9,11 @@ interface ScriptCardProps {
   index: number;
   active: boolean;
   channel: Channel;
-  onSelect: () => void;
   onCopyMessage: (message: string, label: string) => void;
   onCopyAll: (messages: string[], subject?: string) => void;
   onToggleFavorite: () => void;
   onEditMessage: (messageIndex: number, value: string) => void;
+  onEditSubject: (value: string) => void;
 }
 
 export function ScriptCard({
@@ -21,11 +21,11 @@ export function ScriptCard({
   index,
   active,
   channel,
-  onSelect,
   onCopyMessage,
   onCopyAll,
   onToggleFavorite,
   onEditMessage,
+  onEditSubject,
 }: ScriptCardProps) {
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [editValue, setEditValue] = useState('');
@@ -46,7 +46,8 @@ export function ScriptCard({
 
   const saveEdit = () => {
     if (editingIndex !== null) {
-      onEditMessage(editingIndex, editValue);
+      if (editingIndex === -1) onEditSubject(editValue);
+      else onEditMessage(editingIndex, editValue);
       setEditingIndex(null);
       setEditValue('');
     }

@@ -7,6 +7,8 @@ import { HttpError, readJson, withDeadline } from "./http";
 import { generationSchema } from "../domain";
 import { createServerSupabase } from "../supabase/server";
 import { generateWithClaude } from "./anthropic";
+import { composeOpenAI } from "../agent/composeOpenAI";
+import { buildPrompt } from "../agent/buildPrompt";
 
 /** Request-scoped clients only: cookies and identity must never cross requests. */
 export function serverApi() {
@@ -48,6 +50,18 @@ export function serverApi() {
     },
     generateAnthropic: (input, signal) =>
       generateWithClaude(input, settings, signal),
+    generateOpenAI: (input, signal) => {
+      const config = settings.openai;
+      if (!config)
+        throw new HttpError(503, "A API OpenAI-compatível não está configurada.");
+      return composeOpenAI(input, buildPrompt(input), {
+        endpoint: config.endpoint,
+        apiKey: config.apiKey,
+        model: config.model,
+        timeoutMs: 11_000,
+        signal,
+      });
+    },
   });
   return {
     ...base,

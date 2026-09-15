@@ -1,10 +1,5 @@
 import { leadInputSchema, type LeadInput, type ScriptType } from "../domain";
 
-const NAME_PATTERNS = [
-  /(?:com\s+(?:o|a|os|as)\s+)?(\w+(?:\s+\w+)?)/i,
-  /(?:para\s+(?:o|a|os|as)\s+)?(\w+(?:\s+\w+)?)/i,
-  /^(\w+(?:\s+\w+)?)/,
-];
 
 const NICHE_KEYWORDS = [
   "clínica odontológica",
@@ -376,8 +371,6 @@ function extractContext(text: string): string {
 
 /** Parseia linguagem natural para LeadInput estruturado (determinístico, sem IA). */
 export async function parseSituation(raw: string): Promise<LeadInput> {
-  const lower = raw.toLowerCase();
-  
   const name = extractName(raw);
   const niche = extractNiche(raw);
   const channel = extractChannel(raw);

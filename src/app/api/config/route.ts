@@ -1,5 +1,4 @@
 import { readSettings, type Settings } from '@/lib/backend/settings';
-import { createApi, type Dependencies } from '@/lib/backend/api';
 import { withDeadline } from '@/lib/backend/http';
 import { cookies } from 'next/headers';
 
@@ -21,11 +20,12 @@ async function getUser(): Promise<{ id: string; email: string } | null> {
 }
 
 export async function GET() {
-  return withDeadline(async (signal) => {
+  return withDeadline(async () => {
     const [settings, user] = await Promise.all([getSettings(), getUser()]);
     return Response.json({
       supabaseConfigured: !!settings.supabase,
       anthropicConfigured: !!settings.anthropic,
+      openaiConfigured: !!settings.openai,
       user: user ? { id: user.id, email: user.email } : null,
     });
   });

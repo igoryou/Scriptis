@@ -1,4 +1,4 @@
-import { type LeadInput, type Generation, type PromptVersion, type Engine } from "../domain";
+import { type LeadInput, type Generation, type PromptVersion } from "../domain";
 
 const OLLAMA_DEFAULT_ENDPOINT = "http://localhost:11434";
 const OLLAMA_DEFAULT_MODEL = "llama3.1:8b";
@@ -90,21 +90,33 @@ function parseOllamaResponse(response: string, input: LeadInput, promptVersions:
     }
   }
   
-  // Valida estrutura básica
-  const variantes = (parsed as any).variantes || (parsed as any).variants || [];
+  const root = typeof parsed === "object" && parsed !== null
+    ? parsed as Record<string, unknown>
+    : {};
+  const variantes = root.variantes ?? root.variants ?? [];
   if (!Array.isArray(variantes) || variantes.length !== 3) {
     throw new Error("Ollama não retornou 3 variantes válidas");
   }
   
-  const variants = variantes.map((v: any, index: number) => ({
-    id: crypto.randomUUID(),
-    title: v.titulo || v.title || `Variante ${index + 1}`,
-    description: v.descricao || v.description || "Abordagem gerada por IA",
-    messages: Array.isArray(v.mensagens) ? v.mensagens : Array.isArray(v.messages) ? v.messages : [String(v.mensagens || v.message || "")].filter(Boolean),
-    subject: v.assunto || v.subject,
-    favorite: false,
-    version: 1,
-  }));
+  const variants = variantes.map((value: unknown, index: number) => {
+    const variant = typeof value === "object" && value !== null
+      ? value as Record<string, unknown>
+      : {};
+    const rawMessages = variant.mensagens ?? variant.messages ?? variant.message;
+    const messages = Array.isArray(rawMessages)
+      ? rawMessages.filter((message): message is string => typeof message === "string")
+      : typeof rawMessages === "string" ? [rawMessages] : [];
+    const subject = variant.assunto ?? variant.subject;
+    return {
+      id: crypto.randomUUID(),
+      title: typeof (variant.titulo ?? variant.title) === "string" ? String(variant.titulo ?? variant.title) : `Variante ${index + 1}`,
+      description: typeof (variant.descricao ?? variant.description) === "string" ? String(variant.descricao ?? variant.description) : "Abordagem gerada por IA",
+      messages,
+      ...(typeof subject === "string" ? { subject } : {}),
+      favorite: false,
+      version: 1,
+    };
+  });
   
   // Garante que cada variante tem mensagens válidas
   for (const variant of variants) {
@@ -119,7 +131,7 @@ function parseOllamaResponse(response: string, input: LeadInput, promptVersions:
   return {
     id: crypto.randomUUID(),
     createdAt: new Date().toISOString(),
-    situationRaw: input.context,
+    situationRaw: input.context || `${input.scriptType}: ${input.name} — ${input.niche} (${input.channel})`,
     input,
     variants,
     promptVersions,
